@@ -1,0 +1,185 @@
+{
+  "realm": "nuhiris",
+  "enabled": true,
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": true,
+  "editUsernameAllowed": false,
+  "bruteForceProtected": true,
+  "permanentLockout": false,
+  "maxFailureWaitSeconds": 1800,
+  "maxDeltaTimeSeconds": 3600,
+  "failureFactor": 5,
+  "accessTokenLifespan": 900,
+  "ssoSessionMaxLifespan": 604800,
+  "offlineSessionMaxLifespan": 604800,
+  "roles": {
+    "realm": [
+      { "name": "national_admin", "description": "National system administrator" },
+      { "name": "facility_admin", "description": "Facility-level administrator" },
+      { "name": "medical_officer", "description": "Doctor / Medical officer" },
+      { "name": "nurse", "description": "Nurse / Midwife" },
+      { "name": "pharmacist", "description": "Pharmacist" },
+      { "name": "lab_scientist", "description": "Laboratory scientist" },
+      { "name": "health_records_officer", "description": "Health records officer" },
+      { "name": "audit_inspector", "description": "Audit and compliance inspector" },
+      { "name": "patient", "description": "Patient self-service" }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "nuhiris-api",
+      "name": "NUHIRIS API",
+      "enabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "changeme_dev_only",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "publicClient": false,
+      "protocol": "openid-connect",
+      "defaultClientScopes": ["openid", "profile", "email", "roles"]
+    },
+    {
+      "clientId": "nuhiris-web",
+      "name": "NUHIRIS Web Portal",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "redirectUris": ["http://localhost:3001/*"],
+      "webOrigins": ["http://localhost:3001"],
+      "protocol": "openid-connect",
+      "defaultClientScopes": ["openid", "profile", "email", "roles"],
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      }
+    }
+  ],
+  "users": [
+    {
+      "username": "admin",
+      "email": "admin@nuhiris.dev",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "System",
+      "lastName": "Administrator",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "admin123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["national_admin"]
+    },
+    {
+      "username": "dr.adeyemi",
+      "email": "adeyemi@nuhiris.dev",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Oluwaseun",
+      "lastName": "Adeyemi",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "doctor123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["medical_officer"]
+    },
+    {
+      "username": "nurse.ibrahim",
+      "email": "ibrahim@nuhiris.dev",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Fatima",
+      "lastName": "Ibrahim",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "nurse123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["nurse"]
+    },
+    {
+      "username": "records.okafor",
+      "email": "okafor@nuhiris.dev",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Chinedu",
+      "lastName": "Okafor",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "records123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["health_records_officer"]
+    },
+    {
+      "username": "pharm.bello",
+      "email": "bello@nuhiris.dev",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Aminu",
+      "lastName": "Bello",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "pharm123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["pharmacist"]
+    },
+    {
+      "username": "lab.eze",
+      "email": "eze@nuhiris.dev",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Nneka",
+      "lastName": "Eze",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "lab123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["lab_scientist"]
+    }
+  ],
+  "defaultDefaultClientScopes": ["openid", "profile", "email", "roles"],
+  "clientScopes": [
+    {
+      "name": "roles",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "false"
+      },
+      "protocolMappers": [
+        {
+          "name": "realm roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "config": {
+            "multivalued": "true",
+            "claim.name": "roles",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ]
+    }
+  ]
+}

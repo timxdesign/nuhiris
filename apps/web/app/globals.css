@@ -1,0 +1,14 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-brand-primary: #075E54;
+  --color-brand-secondary: #128C7E;
+  --color-brand-accent: #25D366;
+
+  --color-nuhi-pill: #E8F5E9;
+  --color-nuhi-pill-text: #1B5E20;
+
+  --color-alert-emergency: #B71C1C;
+  --color-alert-warning: #E65100;
+  --color-alert-info: #0D47A1;
+}
