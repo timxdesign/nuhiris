@@ -1,7 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
-import * as request from 'supertest';
-import { Server } from 'http';
+import request from 'supertest';
 import { HealthModule } from '../health.module';
 
 describe('HealthController (integration)', () => {
@@ -21,7 +20,7 @@ describe('HealthController (integration)', () => {
   });
 
   it('GET /health/live returns 200 with status ok', () => {
-    return request(app.getHttpServer() as Server)
+    return request(app.getHttpServer())
       .get('/health/live')
       .expect(200)
       .expect((res) => {
@@ -30,13 +29,13 @@ describe('HealthController (integration)', () => {
   });
 
   it('GET /health/ready returns 200', () => {
-    return request(app.getHttpServer() as Server)
+    return request(app.getHttpServer())
       .get('/health/ready')
       .expect(200);
   });
 
   it('GET /health/startup returns 200', () => {
-    return request(app.getHttpServer() as Server)
+    return request(app.getHttpServer())
       .get('/health/startup')
       .expect(200);
   });

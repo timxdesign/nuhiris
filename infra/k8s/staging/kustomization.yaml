@@ -1,0 +1,47 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: nuhiris-staging
+
+namePrefix: staging-
+
+resources:
+  - ../base
+
+patches:
+  - target:
+      kind: Deployment
+      name: nuhiris-api
+    patch: |
+      - op: replace
+        path: /spec/replicas
+        value: 1
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/memory
+        value: 256Mi
+  - target:
+      kind: Deployment
+      name: nuhiris-web
+    patch: |
+      - op: replace
+        path: /spec/replicas
+        value: 1
+  - target:
+      kind: Ingress
+      name: nuhiris-ingress
+    patch: |
+      - op: replace
+        path: /spec/tls/0/hosts
+        value:
+          - api.staging.nuhiris.health.gov.ng
+          - portal.staging.nuhiris.health.gov.ng
+          - auth.staging.nuhiris.health.gov.ng
+      - op: replace
+        path: /spec/rules/0/host
+        value: api.staging.nuhiris.health.gov.ng
+      - op: replace
+        path: /spec/rules/1/host
+        value: portal.staging.nuhiris.health.gov.ng
+      - op: replace
+        path: /spec/rules/2/host
+        value: auth.staging.nuhiris.health.gov.ng

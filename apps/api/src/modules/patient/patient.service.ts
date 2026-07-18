@@ -1,8 +1,10 @@
 import {
   Injectable,
+  Inject,
   ConflictException,
   NotFoundException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -13,11 +15,16 @@ import { UpdatePatientDto } from './dto/update-patient.dto';
 import { SearchPatientDto } from './dto/search-patient.dto';
 import { NinEncryptionService } from './services/nin-encryption.service';
 import { DuplicateDetectionService } from './services/duplicate-detection.service';
+import { INinAuthService } from '../external/interfaces/nin-auth-service.interface';
+import { NIN_AUTH_SERVICE } from '../external/tokens';
+import { BiometricEventService } from '../external/biometric-event.service';
 import { PatientStatus, RegistrationType } from '@nuhiris/shared-types';
 import { PROVISIONAL_DEADLINE_DAYS } from '@nuhiris/shared-types';
 
 @Injectable()
 export class PatientService {
+  private readonly logger = new Logger(PatientService.name);
+
   constructor(
     @InjectRepository(Patient)
     private patientRepo: Repository<Patient>,
@@ -25,6 +32,9 @@ export class PatientService {
     private historyRepo: Repository<PatientHistory>,
     private ninEncryption: NinEncryptionService,
     private duplicateDetection: DuplicateDetectionService,
+    @Inject(NIN_AUTH_SERVICE)
+    private ninAuth: INinAuthService,
+    private biometricEventService: BiometricEventService,
   ) {}
 
   async register(dto: RegisterPatientDto, actorId: string): Promise<Patient> {
@@ -56,6 +66,29 @@ export class PatientService {
       dto.registrationType === RegistrationType.PROVISIONAL ||
       dto.registrationType === RegistrationType.EMERGENCY;
 
+    let ninVerified = false;
+    let ninVerificationMethod: 'biometric' | 'documentary' | null = null;
+    let nimcPhotoRef: string | null = null;
+
+    if (dto.nin && !isProvisional) {
+      const lookup = await this.ninAuth.lookupNin(dto.nin);
+      if (!lookup.found) {
+        throw new BadRequestException('NIN not found in NIMC database');
+      }
+
+      nimcPhotoRef = lookup.photoBase64;
+
+      if (dto.nimcReferenceId) {
+        ninVerified = true;
+        ninVerificationMethod = 'biometric';
+        this.logger.log(`NIN verified via biometric for registration by actor ${actorId}`);
+      } else {
+        ninVerified = true;
+        ninVerificationMethod = 'documentary';
+        this.logger.log(`NIN verified via lookup for registration by actor ${actorId}`);
+      }
+    }
+
     const patient = this.patientRepo.create({
       fullName: dto.fullName,
       dateOfBirth: dto.dateOfBirth,
@@ -66,7 +99,10 @@ export class PatientService {
       email: dto.email ?? null,
       nin: dto.nin ? this.ninEncryption.encrypt(dto.nin) : null,
       ninHash: dto.nin ? this.ninEncryption.hash(dto.nin) : null,
-      ninVerified: false,
+      ninVerified,
+      ninVerificationDate: ninVerified ? new Date() : null,
+      ninVerificationMethod,
+      nimcPhotoRef,
       registrationType: dto.registrationType,
       status: isProvisional ? PatientStatus.PROVISIONAL : PatientStatus.ACTIVE,
       provisionalDeadline: isProvisional ? this.computeDeadline() : null,
@@ -74,7 +110,21 @@ export class PatientService {
       registeredBy: actorId,
     });
 
-    return this.patientRepo.save(patient);
+    const saved = await this.patientRepo.save(patient);
+
+    if (dto.nin && dto.nimcReferenceId) {
+      await this.biometricEventService.recordRegistration({
+        nuhi: saved.nuhi,
+        nin: dto.nin,
+        matched: true,
+        confidenceScore: dto.confidenceScore ?? 0.95,
+        nimcReferenceId: dto.nimcReferenceId,
+        performedBy: actorId,
+        facilityId: dto.facilityId ?? null,
+      });
+    }
+
+    return saved;
   }
 
   async findByNuhi(nuhi: string): Promise<Patient> {

@@ -8,6 +8,7 @@ import {
   BiometricMethod,
   BiometricResult,
 } from '@nuhiris/shared-types';
+import { encryptedTransformer } from '../../../common/transformers/encrypted-column.transformer';
 
 /**
  * Maps to the `biometric_events` parent table.
@@ -22,13 +23,12 @@ export class BiometricEvent {
   @Column({ name: 'nuhi', type: 'uuid', nullable: true })
   nuhi!: string | null;
 
-  /** Encrypted NIN value */
-  @Column({ name: 'nin', type: 'varchar', nullable: true })
+  @Column({ name: 'nin', type: 'varchar', nullable: true, transformer: encryptedTransformer })
   nin!: string | null;
 
   /** FK -> registered_devices.device_id */
-  @Column({ name: 'device_id', type: 'uuid' })
-  deviceId!: string;
+  @Column({ name: 'device_id', type: 'uuid', nullable: true })
+  deviceId!: string | null;
 
   @Column({
     name: 'event_type',

@@ -1,0 +1,67 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nuhiris-web
+  namespace: nuhiris
+  labels:
+    app: nuhiris-web
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: nuhiris-web
+  template:
+    metadata:
+      labels:
+        app: nuhiris-web
+    spec:
+      containers:
+        - name: web
+          image: nuhiris/web:latest
+          ports:
+            - containerPort: 3001
+              name: http
+          env:
+            - name: NODE_ENV
+              value: production
+            - name: NEXT_PUBLIC_API_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: nuhiris-web-config
+                  key: NEXT_PUBLIC_API_URL
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 3001
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 3001
+            initialDelaySeconds: 20
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nuhiris-web
+  namespace: nuhiris
+spec:
+  selector:
+    app: nuhiris-web
+  ports:
+    - port: 80
+      targetPort: 3001
+      protocol: TCP
+  type: ClusterIP

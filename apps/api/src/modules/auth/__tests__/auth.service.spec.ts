@@ -1,4 +1,5 @@
 import { Test } from '@nestjs/testing';
+import { ConfigService } from '@nestjs/config';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { UnauthorizedException, BadRequestException } from '@nestjs/common';
 
@@ -108,6 +109,7 @@ describe('AuthService', () => {
         { provide: SessionService, useValue: sessionService },
         { provide: MfaService, useValue: mfaService },
         { provide: KeycloakAdminService, useValue: keycloakAdmin },
+        { provide: ConfigService, useValue: { get: () => '' } },
       ],
     }).compile();
 

@@ -5,9 +5,12 @@ import {
   IsEnum,
   IsDateString,
   IsUUID,
+  IsNumber,
   Length,
   IsEmail,
   Matches,
+  Min,
+  Max,
 } from 'class-validator';
 import { RegistrationType } from '@nuhiris/shared-types';
 
@@ -51,4 +54,14 @@ export class RegisterPatientDto {
   @IsOptional()
   @IsUUID()
   facilityId?: string;
+
+  @IsOptional()
+  @IsString()
+  nimcReferenceId?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(1)
+  confidenceScore?: number;
 }

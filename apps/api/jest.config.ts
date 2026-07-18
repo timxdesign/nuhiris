@@ -19,6 +19,10 @@ const config: Config = {
   ],
   coverageDirectory: './coverage',
   testEnvironment: 'node',
+  transformIgnorePatterns: [
+    '/node_modules/.pnpm/(?!(otplib|@otplib))',
+    '/node_modules/(?!(\\.pnpm|otplib|@otplib))',
+  ],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
   },

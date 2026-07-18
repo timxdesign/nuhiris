@@ -6,6 +6,8 @@ import { Patient } from '../entities/patient.entity';
 import { PatientHistory } from '../entities/patient-history.entity';
 import { NinEncryptionService } from '../services/nin-encryption.service';
 import { DuplicateDetectionService } from '../services/duplicate-detection.service';
+import { NIN_AUTH_SERVICE } from '../../external/tokens';
+import { BiometricEventService } from '../../external/biometric-event.service';
 import { RegistrationType, PatientStatus } from '@nuhiris/shared-types';
 
 const mockPatient: Patient = {
@@ -101,6 +103,36 @@ describe('PatientService', () => {
         { provide: getRepositoryToken(PatientHistory), useValue: historyRepo },
         { provide: NinEncryptionService, useValue: ninEncryption },
         { provide: DuplicateDetectionService, useValue: duplicateDetection },
+        {
+          provide: NIN_AUTH_SERVICE,
+          useValue: {
+            lookupNin: jest.fn().mockResolvedValue({
+              found: true,
+              nin: '12345678901',
+              firstName: 'Aisha',
+              lastName: 'Bello',
+              middleName: null,
+              dateOfBirth: '1990-05-15',
+              gender: 'female',
+              state: 'Lagos',
+              lga: 'Ikeja',
+              photoBase64: null,
+              nimcReferenceId: 'NIMC-REF-1',
+            }),
+            verifyBiometric: jest.fn(),
+            verifyLiveness: jest.fn(),
+            verifyFaceMatch: jest.fn(),
+          },
+        },
+        {
+          provide: BiometricEventService,
+          useValue: {
+            recordLookup: jest.fn().mockResolvedValue({ eventId: 'evt-1' }),
+            recordLiveness: jest.fn().mockResolvedValue({ eventId: 'evt-2' }),
+            recordFaceMatch: jest.fn().mockResolvedValue({ eventId: 'evt-3' }),
+            recordRegistration: jest.fn().mockResolvedValue({ eventId: 'evt-4' }),
+          },
+        },
       ],
     }).compile();
 

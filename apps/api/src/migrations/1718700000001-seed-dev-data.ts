@@ -37,7 +37,8 @@ export class SeedDevData1718700000001 implements MigrationInterface {
         ('c0000000-0000-4000-8000-000000000004','nurse.chidi','chidi@luth.gov.ng','${passwordHash}','nurse',false,'b0000000-0000-4000-8000-000000000002','a0000000-0000-4000-8000-000000000001','active'),
         ('c0000000-0000-4000-8000-000000000005','pharm.fatima','fatima@luth.gov.ng','${passwordHash}','pharmacist',false,'b0000000-0000-4000-8000-000000000003','a0000000-0000-4000-8000-000000000001','active'),
         ('c0000000-0000-4000-8000-000000000006','lab.emeka','emeka@fmckeffi.gov.ng','${passwordHash}','lab_scientist',false,'b0000000-0000-4000-8000-000000000004','a0000000-0000-4000-8000-000000000002','active'),
-        ('c0000000-0000-4000-8000-000000000007','hro.aisha','aisha@luth.gov.ng','${passwordHash}','health_records_officer',false,NULL,'a0000000-0000-4000-8000-000000000001','active')
+        ('c0000000-0000-4000-8000-000000000007','hro.aisha','aisha@luth.gov.ng','${passwordHash}','health_records_officer',false,NULL,'a0000000-0000-4000-8000-000000000001','active'),
+        ('c0000000-0000-4000-8000-000000000099','timothy','exodustimothy@gmail.com','$2b$12$j/mv3cQMjCHR0u9xvvvzveDnNt.xltxHCHhWKBACp3scW5OED.wNm','national_admin',false,NULL,NULL,'active')
     `);
 
     // ─── Provider affiliations ───
@@ -72,7 +73,7 @@ export class SeedDevData1718700000001 implements MigrationInterface {
     await queryRunner.query(`DELETE FROM "patients" WHERE "nuhi" IN ('f0000000-0000-4000-8000-000000000001','f0000000-0000-4000-8000-000000000002','f0000000-0000-4000-8000-000000000003')`);
     await queryRunner.query(`DELETE FROM "registered_devices" WHERE "device_id" IN ('e0000000-0000-4000-8000-000000000001','e0000000-0000-4000-8000-000000000002')`);
     await queryRunner.query(`DELETE FROM "provider_affiliations" WHERE "affiliation_id" LIKE 'd0000000-%'`);
-    await queryRunner.query(`DELETE FROM "user_accounts" WHERE "account_id" LIKE 'c0000000-%'`);
+    await queryRunner.query(`DELETE FROM "user_accounts" WHERE "account_id" LIKE 'c0000000-%' OR "email" = 'exodustimothy@gmail.com'`);
     await queryRunner.query(`DELETE FROM "providers" WHERE "provider_id" LIKE 'b0000000-%'`);
     await queryRunner.query(`DELETE FROM "facilities" WHERE "facility_id" LIKE 'a0000000-%'`);
   }

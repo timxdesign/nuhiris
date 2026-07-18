@@ -1,7 +1,9 @@
 import { Injectable, UnauthorizedException, BadRequestException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { ConfigService } from '@nestjs/config';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
+import * as jwt from 'jsonwebtoken';
 import { UserAccount } from './entities/user-account.entity';
 import { SessionService } from './services/session.service';
 import { MfaService } from './services/mfa.service';
@@ -26,13 +28,18 @@ const MFA_REQUIRED_ROLES: UserRole[] = [
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
 
+  private readonly devSecret: string;
+
   constructor(
     @InjectRepository(UserAccount)
     private userRepo: Repository<UserAccount>,
     private sessionService: SessionService,
     private mfaService: MfaService,
     private keycloakAdmin: KeycloakAdminService,
-  ) {}
+    config: ConfigService,
+  ) {
+    this.devSecret = config.get<string>('keycloak.devSecret') ?? '';
+  }
 
   async login(username: string, password: string): Promise<AuthResponseDto | MfaChallengeResponseDto> {
     const user = await this.userRepo.findOne({ where: { username } });
@@ -148,9 +155,23 @@ export class AuthService {
       accessToken = keycloakResponse.access_token;
       expiresIn = keycloakResponse.expires_in;
     } catch {
-      accessToken = '';
       expiresIn = 900;
-      this.logger.warn(`Keycloak token exchange failed for ${user.username}, issuing session without KC token`);
+      if (this.devSecret) {
+        accessToken = jwt.sign(
+          {
+            sub: user.accountId,
+            roles: [user.role],
+            facility_id: user.facilityId,
+            provider_id: user.providerId,
+          },
+          this.devSecret,
+          { algorithm: 'HS256', expiresIn },
+        );
+        this.logger.warn(`Keycloak unavailable — issued dev JWT for ${user.username}`);
+      } else {
+        accessToken = '';
+        this.logger.warn(`Keycloak token exchange failed for ${user.username}, no dev secret set`);
+      }
     }
 
     const refreshToken = await this.sessionService.createRefreshToken({

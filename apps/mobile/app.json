@@ -1,0 +1,39 @@
+{
+  "expo": {
+    "name": "NUHIRIS",
+    "slug": "nuhiris",
+    "version": "1.0.0",
+    "scheme": "nuhiris",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#075E54"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "ng.gov.health.nuhiris"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#075E54"
+      },
+      "package": "ng.gov.health.nuhiris"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-local-authentication",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow NUHIRIS to access camera for QR scanning"
+        }
+      ],
+      "expo-sqlite"
+    ]
+  }
+}

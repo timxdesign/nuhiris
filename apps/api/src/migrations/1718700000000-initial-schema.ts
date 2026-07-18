@@ -264,7 +264,7 @@ export class InitialSchema1718700000000 implements MigrationInterface {
         "event_id" uuid NOT NULL DEFAULT uuid_generate_v4(),
         "nuhi" uuid,
         "nin" varchar,
-        "device_id" uuid NOT NULL,
+        "device_id" uuid,
         "event_type" "biometric_event_type_enum" NOT NULL,
         "method" "biometric_method_enum" NOT NULL,
         "result" "biometric_result_enum" NOT NULL,
@@ -278,7 +278,7 @@ export class InitialSchema1718700000000 implements MigrationInterface {
         "facility_id" uuid,
         "timestamp" timestamptz NOT NULL DEFAULT NOW(),
         CONSTRAINT "PK_biometric_events" PRIMARY KEY ("event_id"),
-        CONSTRAINT "FK_bio_events_device" FOREIGN KEY ("device_id") REFERENCES "registered_devices"("device_id"),
+        CONSTRAINT "FK_bio_events_device" FOREIGN KEY ("device_id") REFERENCES "registered_devices"("device_id") ON DELETE SET NULL,
         CONSTRAINT "FK_bio_events_nuhi" FOREIGN KEY ("nuhi") REFERENCES "patients"("nuhi"),
         CONSTRAINT "FK_bio_events_performed_by" FOREIGN KEY ("performed_by") REFERENCES "user_accounts"("account_id"),
         CONSTRAINT "FK_bio_events_facility" FOREIGN KEY ("facility_id") REFERENCES "facilities"("facility_id")

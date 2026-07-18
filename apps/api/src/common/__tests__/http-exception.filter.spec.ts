@@ -14,7 +14,7 @@ describe('GlobalExceptionFilter', () => {
     mockHost = {
       switchToHttp: () => ({
         getResponse: () => ({ status: mockStatus }),
-        getRequest: () => ({ url: '/test', method: 'GET' }),
+        getRequest: () => ({ url: '/test', method: 'GET', headers: {} }),
       }),
     } as unknown as ArgumentsHost;
   });
@@ -28,7 +28,8 @@ describe('GlobalExceptionFilter', () => {
       expect.objectContaining({
         success: false,
         error: expect.objectContaining({
-          statusCode: 404,
+          code: 'REQUEST_ERROR',
+          message: 'Not Found',
         }),
       }),
     );
@@ -56,7 +57,7 @@ describe('GlobalExceptionFilter', () => {
       expect.objectContaining({
         success: false,
         error: expect.objectContaining({
-          statusCode: 500,
+          code: 'INTERNAL_ERROR',
           message: 'Internal server error',
         }),
       }),

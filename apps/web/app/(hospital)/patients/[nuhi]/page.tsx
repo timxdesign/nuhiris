@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { api } from '../../../../lib/api-client';
@@ -21,36 +21,76 @@ interface Patient {
   createdAt: string;
 }
 
+interface Encounter {
+  encounterId: string;
+  encounterType: string;
+  status: string;
+  reason: string | null;
+  dateTime: string;
+}
+
+interface Allergy {
+  allergyId: string;
+  substanceName: string;
+  reaction: string | null;
+  severity: string | null;
+  status: string;
+}
+
+interface Immunisation {
+  immunisationId: string;
+  vaccineName: string;
+  doseNumber: number | null;
+  administeredAt: string;
+  status: string;
+}
+
 export default function PatientProfilePage() {
   const params = useParams<{ nuhi: string }>();
   const [patient, setPatient] = useState<Patient | null>(null);
+  const [encounters, setEncounters] = useState<Encounter[]>([]);
+  const [allergies, setAllergies] = useState<Allergy[]>([]);
+  const [immunisations, setImmunisations] = useState<Immunisation[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    async function load() {
-      try {
-        const data = await api<Patient>(`/patients/${params.nuhi}`);
-        setPatient(data);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load patient');
-      } finally {
-        setLoading(false);
-      }
+  const loadData = useCallback(async () => {
+    try {
+      const [patientData, encounterData, allergyData, immunData] = await Promise.all([
+        api<Patient>(`/patients/${params.nuhi}`),
+        api<[Encounter[], number]>(`/encounters/patient/${params.nuhi}?page=1&limit=10`).catch(() => [[], 0] as [Encounter[], number]),
+        api<Allergy[]>(`/encounters/patient/${params.nuhi}/allergies`).catch(() => [] as Allergy[]),
+        api<Immunisation[]>(`/encounters/patient/${params.nuhi}/immunisations`).catch(() => [] as Immunisation[]),
+      ]);
+      setPatient(patientData);
+      setEncounters(Array.isArray(encounterData) ? encounterData[0] : []);
+      setAllergies(allergyData);
+      setImmunisations(immunData);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load patient');
+    } finally {
+      setLoading(false);
     }
-    load();
   }, [params.nuhi]);
 
+  useEffect(() => { void loadData(); }, [loadData]);
+
   if (loading) {
-    return <div className="text-gray-500">Loading patient...</div>;
+    return <div className="text-gray-500 py-12 text-center">Loading patient...</div>;
   }
 
   if (error || !patient) {
     return <div className="text-red-600">{error || 'Patient not found'}</div>;
   }
 
+  const statusColor: Record<string, string> = {
+    open: 'bg-green-100 text-green-700',
+    in_progress: 'bg-blue-100 text-blue-700',
+    closed: 'bg-gray-100 text-gray-600',
+  };
+
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="mx-auto max-w-4xl">
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">{patient.fullName}</h1>
@@ -58,17 +98,25 @@ export default function PatientProfilePage() {
             NUHI: {patient.nuhi}
           </span>
         </div>
-        <span
-          className={`rounded-full px-3 py-1 text-sm font-medium ${
-            patient.status === 'active'
-              ? 'bg-green-100 text-green-700'
-              : patient.status === 'provisional'
-                ? 'bg-amber-100 text-amber-700'
-                : 'bg-gray-100 text-gray-700'
-          }`}
-        >
-          {patient.status}
-        </span>
+        <div className="flex items-center gap-3">
+          <Link
+            href={`/encounters/new?nuhi=${patient.nuhi}`}
+            className="rounded-lg bg-[#075E54] px-4 py-2 text-sm font-medium text-white hover:bg-[#064E46]"
+          >
+            New Encounter
+          </Link>
+          <span
+            className={`rounded-full px-3 py-1 text-sm font-medium ${
+              patient.status === 'active'
+                ? 'bg-green-100 text-green-700'
+                : patient.status === 'provisional'
+                  ? 'bg-amber-100 text-amber-700'
+                  : 'bg-gray-100 text-gray-700'
+            }`}
+          >
+            {patient.status}
+          </span>
+        </div>
       </div>
 
       {patient.provisionalDeadline && (
@@ -115,11 +163,69 @@ export default function PatientProfilePage() {
             <dt className="text-gray-500">Registration Type</dt>
             <dd className="font-medium capitalize text-gray-900">{patient.registrationType.replace(/_/g, ' ')}</dd>
           </div>
-          <div>
-            <dt className="text-gray-500">Registered On</dt>
-            <dd className="font-medium text-gray-900">{new Date(patient.createdAt).toLocaleDateString()}</dd>
-          </div>
         </dl>
+      </div>
+
+      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <div className="rounded-xl border border-gray-200 bg-white p-5">
+          <h3 className="text-sm font-semibold text-gray-900">Allergies</h3>
+          {allergies.length === 0 ? (
+            <p className="mt-2 text-sm text-gray-500">No known allergies</p>
+          ) : (
+            <ul className="mt-2 space-y-2">
+              {allergies.map((a) => (
+                <li key={a.allergyId} className="flex items-center justify-between rounded-lg bg-red-50 px-3 py-2">
+                  <span className="text-sm font-medium text-red-800">{a.substanceName}</span>
+                  {a.severity && <span className="text-xs text-red-600">{a.severity}</span>}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <div className="rounded-xl border border-gray-200 bg-white p-5">
+          <h3 className="text-sm font-semibold text-gray-900">Immunisations</h3>
+          {immunisations.length === 0 ? (
+            <p className="mt-2 text-sm text-gray-500">No immunisation records</p>
+          ) : (
+            <ul className="mt-2 space-y-2">
+              {immunisations.map((im) => (
+                <li key={im.immunisationId} className="flex items-center justify-between rounded-lg bg-blue-50 px-3 py-2">
+                  <span className="text-sm font-medium text-blue-800">{im.vaccineName}{im.doseNumber ? ` (Dose ${im.doseNumber})` : ''}</span>
+                  <span className="text-xs text-blue-600">{new Date(im.administeredAt).toLocaleDateString()}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+
+      <div className="mt-6 rounded-xl border border-gray-200 bg-white p-5">
+        <h3 className="mb-3 text-sm font-semibold text-gray-900">Clinical Timeline</h3>
+        {encounters.length === 0 ? (
+          <p className="text-sm text-gray-500">No encounters on record.</p>
+        ) : (
+          <div className="space-y-3">
+            {encounters.map((enc) => (
+              <Link
+                key={enc.encounterId}
+                href={`/encounters/${enc.encounterId}`}
+                className="flex items-center justify-between rounded-lg border border-gray-100 p-3 hover:bg-gray-50"
+              >
+                <div>
+                  <p className="text-sm font-medium text-gray-900 capitalize">{enc.encounterType}</p>
+                  <p className="text-xs text-gray-500">{enc.reason ?? 'No reason specified'}</p>
+                </div>
+                <div className="text-right">
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusColor[enc.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                    {enc.status.replace('_', ' ')}
+                  </span>
+                  <p className="mt-1 text-xs text-gray-500">{new Date(enc.dateTime).toLocaleDateString()}</p>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="mt-4">

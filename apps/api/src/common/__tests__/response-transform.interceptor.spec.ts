@@ -9,7 +9,11 @@ describe('ResponseTransformInterceptor', () => {
     interceptor = new ResponseTransformInterceptor();
   });
 
-  const context = {} as ExecutionContext;
+  const context = {
+    switchToHttp: () => ({
+      getRequest: () => ({ headers: { 'x-request-id': 'test-req-id' } }),
+    }),
+  } as unknown as ExecutionContext;
 
   it('wraps response data in success envelope', (done) => {
     const handler: CallHandler = {
@@ -17,10 +21,10 @@ describe('ResponseTransformInterceptor', () => {
     };
 
     interceptor.intercept(context, handler).subscribe((result) => {
-      expect(result).toEqual({
-        success: true,
-        data: { id: 1, name: 'test' },
-      });
+      const r = result as Record<string, unknown>;
+      expect(r.success).toBe(true);
+      expect(r.data).toEqual({ id: 1, name: 'test' });
+      expect(r.meta).toHaveProperty('requestId', 'test-req-id');
       done();
     });
   });
@@ -31,10 +35,9 @@ describe('ResponseTransformInterceptor', () => {
     };
 
     interceptor.intercept(context, handler).subscribe((result) => {
-      expect(result).toEqual({
-        success: true,
-        data: null,
-      });
+      const r = result as Record<string, unknown>;
+      expect(r.success).toBe(true);
+      expect(r.data).toBeNull();
       done();
     });
   });
@@ -45,10 +48,9 @@ describe('ResponseTransformInterceptor', () => {
     };
 
     interceptor.intercept(context, handler).subscribe((result) => {
-      expect(result).toEqual({
-        success: true,
-        data: [1, 2, 3],
-      });
+      const r = result as Record<string, unknown>;
+      expect(r.success).toBe(true);
+      expect(r.data).toEqual([1, 2, 3]);
       done();
     });
   });

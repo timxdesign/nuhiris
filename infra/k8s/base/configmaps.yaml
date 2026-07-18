@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nuhiris-api-config
+  namespace: nuhiris
+data:
+  DB_HOST: postgres
+  DB_PORT: "5432"
+  DB_NAME: nuhiris
+  REDIS_HOST: redis
+  REDIS_PORT: "6379"
+  KEYCLOAK_BASE_URL: http://keycloak:8080
+  KEYCLOAK_REALM: nuhiris
+  KEYCLOAK_CLIENT_ID: nuhiris-api
+  CORS_ORIGIN: https://portal.nuhiris.health.gov.ng
+  VAULT_ENABLED: "true"
+  VAULT_ADDR: http://vault:8200
+  VAULT_AUTH_METHOD: approle
+  VAULT_MOUNT_PATH: secret
+  VAULT_SECRET_PATH: nuhiris
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nuhiris-web-config
+  namespace: nuhiris
+data:
+  NEXT_PUBLIC_API_URL: https://api.nuhiris.health.gov.ng
+  NEXT_PUBLIC_KEYCLOAK_URL: https://auth.nuhiris.health.gov.ng
+  NEXT_PUBLIC_KEYCLOAK_REALM: nuhiris
+  NEXT_PUBLIC_KEYCLOAK_CLIENT_ID: nuhiris-web

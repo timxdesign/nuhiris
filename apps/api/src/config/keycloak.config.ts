@@ -9,4 +9,5 @@ export default registerAs('keycloak', () => ({
   adminPassword: process.env.KEYCLOAK_ADMIN_PASSWORD ?? 'admin',
   jwksUrl: process.env.JWT_PUBLIC_KEY_URL ??
     'http://localhost:8080/realms/nuhiris/protocol/openid-connect/certs',
+  devSecret: process.env.JWT_DEV_SECRET ?? '',
 }));

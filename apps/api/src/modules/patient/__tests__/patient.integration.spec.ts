@@ -1,21 +1,28 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
-import * as request from 'supertest';
-import { Server } from 'http';
+import request from 'supertest';
 import { PatientController } from '../patient.controller';
 import { PatientService } from '../patient.service';
-import { APP_GUARD } from '@nestjs/core';
-import { RegistrationType, PatientStatus } from '@nuhiris/shared-types';
+import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../../auth/guards/roles.guard';
+import { RegistrationType, PatientStatus, UserRole } from '@nuhiris/shared-types';
+
+const mockGuard = {
+  canActivate: (context: { switchToHttp: () => { getRequest: () => Record<string, unknown> } }) => {
+    const req = context.switchToHttp().getRequest();
+    req['user'] = { sub: 'actor-1', roles: [UserRole.NATIONAL_ADMIN], facilityId: null };
+    return true;
+  },
+};
 
 describe('PatientController (integration)', () => {
   let app: INestApplication;
-  let patientService: Partial<PatientService>;
 
   const mockPatient = {
     nuhi: '11111111-1111-4111-8111-111111111111',
     fullName: 'Test Patient',
     dateOfBirth: '1990-01-01',
-    sex: 'male' as const,
+    sex: 'male',
     state: 'Lagos',
     lga: null,
     phone: null,
@@ -23,37 +30,32 @@ describe('PatientController (integration)', () => {
     nin: null,
     ninHash: null,
     ninVerified: false,
-    ninVerificationDate: null,
-    ninVerificationMethod: null,
-    nimcPhotoRef: null,
     registrationType: RegistrationType.BIOMETRIC_VERIFIED,
     status: PatientStatus.ACTIVE,
     provisionalDeadline: null,
-    deceasedAt: null,
-    mergedInto: null,
-    registrationFacilityId: null,
-    registeredBy: 'actor-1',
     createdAt: new Date(),
     updatedAt: new Date(),
   };
 
-  beforeAll(async () => {
-    patientService = {
-      register: jest.fn().mockResolvedValue(mockPatient),
-      findByNuhi: jest.fn().mockResolvedValue(mockPatient),
-      search: jest.fn().mockResolvedValue([[mockPatient], 1]),
-      update: jest.fn().mockResolvedValue(mockPatient),
-      upgradeProvisional: jest.fn().mockResolvedValue(mockPatient),
-      getHistory: jest.fn().mockResolvedValue([]),
-    };
+  const mockPatientService = {
+    register: jest.fn().mockResolvedValue(mockPatient),
+    findByNuhi: jest.fn().mockResolvedValue(mockPatient),
+    search: jest.fn().mockResolvedValue([[mockPatient], 1]),
+    update: jest.fn().mockResolvedValue(mockPatient),
+    upgradeProvisional: jest.fn().mockResolvedValue(mockPatient),
+    getHistory: jest.fn().mockResolvedValue([]),
+  };
 
+  beforeAll(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [PatientController],
       providers: [
-        { provide: PatientService, useValue: patientService },
-        { provide: APP_GUARD, useValue: { canActivate: () => true } },
+        { provide: PatientService, useValue: mockPatientService },
       ],
-    }).compile();
+    })
+      .overrideGuard(JwtAuthGuard).useValue(mockGuard)
+      .overrideGuard(RolesGuard).useValue(mockGuard)
+      .compile();
 
     app = module.createNestApplication();
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
@@ -66,9 +68,8 @@ describe('PatientController (integration)', () => {
 
   describe('POST /patients', () => {
     it('creates a patient and returns the record', async () => {
-      const res = await request(app.getHttpServer() as Server)
+      const res = await request(app.getHttpServer())
         .post('/patients')
-        .set('Authorization', 'Bearer fake-token')
         .send({
           fullName: 'Test Patient',
           dateOfBirth: '1990-01-01',
@@ -85,20 +86,18 @@ describe('PatientController (integration)', () => {
 
   describe('GET /patients/search', () => {
     it('searches by name', async () => {
-      const res = await request(app.getHttpServer() as Server)
+      await request(app.getHttpServer())
         .get('/patients/search?fullName=Test')
-        .set('Authorization', 'Bearer fake-token')
         .expect(200);
 
-      expect(patientService.search).toHaveBeenCalled();
+      expect(mockPatientService.search).toHaveBeenCalled();
     });
   });
 
   describe('GET /patients/:nuhi', () => {
     it('returns a patient by NUHI', async () => {
-      const res = await request(app.getHttpServer() as Server)
+      const res = await request(app.getHttpServer())
         .get(`/patients/${mockPatient.nuhi}`)
-        .set('Authorization', 'Bearer fake-token')
         .expect(200);
 
       expect(res.body.nuhi).toBe(mockPatient.nuhi);
@@ -107,21 +106,19 @@ describe('PatientController (integration)', () => {
 
   describe('PATCH /patients/:nuhi', () => {
     it('updates a patient record', async () => {
-      await request(app.getHttpServer() as Server)
+      await request(app.getHttpServer())
         .patch(`/patients/${mockPatient.nuhi}`)
-        .set('Authorization', 'Bearer fake-token')
         .send({ fullName: 'Updated Name' })
         .expect(200);
 
-      expect(patientService.update).toHaveBeenCalled();
+      expect(mockPatientService.update).toHaveBeenCalled();
     });
   });
 
   describe('GET /patients/:nuhi/history', () => {
     it('returns patient change history', async () => {
-      const res = await request(app.getHttpServer() as Server)
+      const res = await request(app.getHttpServer())
         .get(`/patients/${mockPatient.nuhi}/history`)
-        .set('Authorization', 'Bearer fake-token')
         .expect(200);
 
       expect(Array.isArray(res.body)).toBe(true);

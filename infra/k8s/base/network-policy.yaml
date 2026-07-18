@@ -1,0 +1,36 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: api-db-only
+  namespace: nuhiris
+spec:
+  podSelector:
+    matchLabels:
+      app: postgres
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: nuhiris-api
+        - podSelector:
+            matchLabels:
+              app: keycloak
+      ports:
+        - port: 5432
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: redis-api-only
+  namespace: nuhiris
+spec:
+  podSelector:
+    matchLabels:
+      app: redis
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: nuhiris-api
+      ports:
+        - port: 6379

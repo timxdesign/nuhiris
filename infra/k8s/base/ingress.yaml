@@ -1,0 +1,50 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: nuhiris-ingress
+  namespace: nuhiris
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - api.nuhiris.health.gov.ng
+        - portal.nuhiris.health.gov.ng
+        - auth.nuhiris.health.gov.ng
+      secretName: nuhiris-tls
+  rules:
+    - host: api.nuhiris.health.gov.ng
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: nuhiris-api
+                port:
+                  number: 80
+    - host: portal.nuhiris.health.gov.ng
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: nuhiris-web
+                port:
+                  number: 80
+    - host: auth.nuhiris.health.gov.ng
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: keycloak
+                port:
+                  number: 8080

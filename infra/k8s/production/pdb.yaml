@@ -1,0 +1,21 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: nuhiris-api-pdb
+  namespace: nuhiris
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: nuhiris-api
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: nuhiris-web-pdb
+  namespace: nuhiris
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: nuhiris-web

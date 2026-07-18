@@ -1,24 +1,36 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
-import { Strategy, ExtractJwt } from 'passport-jwt';
+import { Strategy, ExtractJwt, StrategyOptionsWithoutRequest } from 'passport-jwt';
 import { passportJwtSecret } from 'jwks-rsa';
 import { IJwtPayload } from '@nuhiris/shared-types';
+
+function buildOptions(config: ConfigService): StrategyOptionsWithoutRequest {
+  const devSecret = config.get<string>('keycloak.devSecret');
+  if (devSecret) {
+    Logger.warn('Using symmetric JWT_DEV_SECRET — do not use in production', 'JwtStrategy');
+    return {
+      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+      secretOrKey: devSecret,
+      algorithms: ['HS256'],
+    };
+  }
+  return {
+    jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+    secretOrKeyProvider: passportJwtSecret({
+      cache: true,
+      rateLimit: true,
+      jwksRequestsPerMinute: 10,
+      jwksUri: config.get<string>('keycloak.jwksUrl')!,
+    }),
+    algorithms: ['RS256'],
+  };
+}
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(config: ConfigService) {
-    const jwksUrl = config.get<string>('keycloak.jwksUrl')!;
-    super({
-      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
-      secretOrKeyProvider: passportJwtSecret({
-        cache: true,
-        rateLimit: true,
-        jwksRequestsPerMinute: 10,
-        jwksUri: jwksUrl,
-      }),
-      algorithms: ['RS256'],
-    });
+    super(buildOptions(config));
   }
 
   validate(payload: Record<string, unknown>): IJwtPayload {

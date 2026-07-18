@@ -9,6 +9,7 @@ import {
   RegistrationType,
   PatientStatus,
 } from '@nuhiris/shared-types';
+import { encryptedTransformer } from '../../../common/transformers/encrypted-column.transformer';
 
 @Entity('patients')
 export class Patient {
@@ -64,7 +65,7 @@ export class Patient {
   })
   ninVerificationMethod!: 'biometric' | 'documentary' | 'manual_review' | null;
 
-  @Column({ name: 'nimc_photo_ref', type: 'varchar', nullable: true })
+  @Column({ name: 'nimc_photo_ref', type: 'varchar', nullable: true, transformer: encryptedTransformer })
   nimcPhotoRef!: string | null;
 
   @Column({
