@@ -12,7 +12,6 @@ import {
 import { router } from 'expo-router';
 import { api } from '../lib/api';
 import { enqueueSync } from '../lib/offline-db';
-import { v4 as uuid } from 'react-native-uuid' ;
 
 export default function RegisterPatientScreen() {
   const [fullName, setFullName] = useState('');

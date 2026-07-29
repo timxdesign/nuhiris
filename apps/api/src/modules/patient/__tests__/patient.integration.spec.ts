@@ -40,6 +40,7 @@ describe('PatientController (integration)', () => {
   const mockPatientService = {
     register: jest.fn().mockResolvedValue(mockPatient),
     findByNuhi: jest.fn().mockResolvedValue(mockPatient),
+    findByAccountId: jest.fn().mockResolvedValue(mockPatient),
     search: jest.fn().mockResolvedValue([[mockPatient], 1]),
     update: jest.fn().mockResolvedValue(mockPatient),
     upgradeProvisional: jest.fn().mockResolvedValue(mockPatient),
@@ -91,6 +92,17 @@ describe('PatientController (integration)', () => {
         .expect(200);
 
       expect(mockPatientService.search).toHaveBeenCalled();
+    });
+  });
+
+  describe('GET /patients/me', () => {
+    it('returns the patient linked to the authenticated account', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/patients/me')
+        .expect(200);
+
+      expect(res.body.nuhi).toBe(mockPatient.nuhi);
+      expect(mockPatientService.findByAccountId).toHaveBeenCalledWith('actor-1');
     });
   });
 

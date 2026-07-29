@@ -19,15 +19,18 @@ export default function PatientRecordsPage() {
   useEffect(() => {
     async function load() {
       try {
-        const result = await api<{ data: PatientEncounter[] }>('/patients/me/encounters');
-        setEncounters((result as unknown as { data: PatientEncounter[] })?.data ?? []);
+        const profile = await api<{ nuhi: string }>('/patients/me');
+        const result = await api<[PatientEncounter[], number]>(
+          `/encounters/patient/${profile.nuhi}?page=1&limit=50`,
+        );
+        setEncounters(Array.isArray(result) ? result[0] : []);
       } catch {
         setEncounters([]);
       } finally {
         setLoading(false);
       }
     }
-    load();
+    void load();
   }, []);
 
   if (loading) {

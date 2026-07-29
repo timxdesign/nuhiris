@@ -48,6 +48,10 @@ export class UserAccount {
   @Column({ name: 'facility_id', type: 'uuid', nullable: true })
   facilityId!: string | null;
 
+  /** FK -> patients.nuhi — set for patient-portal accounts */
+  @Column({ name: 'patient_nuhi', type: 'uuid', nullable: true })
+  patientNuhi!: string | null;
+
   @Column({
     name: 'status',
     type: 'varchar',

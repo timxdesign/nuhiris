@@ -42,6 +42,12 @@ export class PatientController {
     return this.patientService.search(searchDto, pagination.page, pagination.limit);
   }
 
+  @Get('me')
+  @Roles(UserRole.PATIENT)
+  findOwnRecord(@CurrentUser() user: IJwtPayload) {
+    return this.patientService.findByAccountId(user.sub);
+  }
+
   @Get(':nuhi')
   findByNuhi(@Param('nuhi', ParseUUIDPipe) nuhi: string) {
     return this.patientService.findByNuhi(nuhi);

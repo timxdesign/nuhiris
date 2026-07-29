@@ -1,9 +1,14 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { api } from '../../../../lib/api-client';
+import { api, ApiError } from '../../../../lib/api-client';
+import { AccessLoggedBadge } from '../../../../components/access-logged-badge';
+import { BreakGlassModal } from '../../../../components/break-glass-modal';
+import { ConsentPanel } from '../../../../components/consent-panel';
+import { DocumentsPanel } from '../../../../components/documents-panel';
+import { useAuth } from '../../../../hooks/use-auth';
 
 interface Patient {
   nuhi: string;
@@ -47,12 +52,15 @@ interface Immunisation {
 
 export default function PatientProfilePage() {
   const params = useParams<{ nuhi: string }>();
+  const router = useRouter();
+  const { user } = useAuth();
   const [patient, setPatient] = useState<Patient | null>(null);
   const [encounters, setEncounters] = useState<Encounter[]>([]);
   const [allergies, setAllergies] = useState<Allergy[]>([]);
   const [immunisations, setImmunisations] = useState<Immunisation[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+  const [consentBlocked, setConsentBlocked] = useState(false);
 
   const loadData = useCallback(async () => {
     try {
@@ -66,14 +74,44 @@ export default function PatientProfilePage() {
       setEncounters(Array.isArray(encounterData) ? encounterData[0] : []);
       setAllergies(allergyData);
       setImmunisations(immunData);
+      setConsentBlocked(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load patient');
+      if (err instanceof ApiError && err.status === 403) {
+        setConsentBlocked(true);
+      } else {
+        setError(err instanceof Error ? err.message : 'Failed to load patient');
+      }
     } finally {
       setLoading(false);
     }
   }, [params.nuhi]);
 
   useEffect(() => { void loadData(); }, [loadData]);
+
+  if (consentBlocked) {
+    const canBreakGlass = user && ['medical_officer', 'national_admin'].includes(user.role);
+    if (canBreakGlass) {
+      return (
+        <BreakGlassModal
+          patientNuhi={params.nuhi}
+          onGranted={() => { setLoading(true); void loadData(); }}
+          onCancel={() => router.push('/patients')}
+        />
+      );
+    }
+    return (
+      <div className="mx-auto max-w-lg rounded-xl border border-red-200 bg-red-50 p-6 text-center">
+        <p className="font-medium text-red-800">Access blocked — no active consent</p>
+        <p className="mt-1 text-sm text-red-700">
+          This patient has not granted consent for you to view their records. Ask the patient to
+          grant consent, or escalate to a medical officer for emergency access.
+        </p>
+        <Link href="/patients" className="mt-4 inline-block text-sm text-[#075E54] hover:underline">
+          &larr; Back to search
+        </Link>
+      </div>
+    );
+  }
 
   if (loading) {
     return <div className="text-gray-500 py-12 text-center">Loading patient...</div>;
@@ -97,6 +135,8 @@ export default function PatientProfilePage() {
           <span className="mt-1 inline-block rounded-lg bg-[#E8F5E9] px-3 py-1 font-mono text-sm font-bold text-[#1B5E20]">
             NUHI: {patient.nuhi}
           </span>
+          <br />
+          <AccessLoggedBadge />
         </div>
         <div className="flex items-center gap-3">
           <Link
@@ -164,6 +204,14 @@ export default function PatientProfilePage() {
             <dd className="font-medium capitalize text-gray-900">{patient.registrationType.replace(/_/g, ' ')}</dd>
           </div>
         </dl>
+      </div>
+
+      <div className="mt-6">
+        <ConsentPanel nuhi={patient.nuhi} />
+      </div>
+
+      <div className="mt-6">
+        <DocumentsPanel nuhi={patient.nuhi} />
       </div>
 
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">

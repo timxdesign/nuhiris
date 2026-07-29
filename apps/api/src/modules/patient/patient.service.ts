@@ -10,6 +10,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Patient } from './entities/patient.entity';
 import { PatientHistory } from './entities/patient-history.entity';
+import { UserAccount } from '../auth/entities/user-account.entity';
 import { RegisterPatientDto } from './dto/register-patient.dto';
 import { UpdatePatientDto } from './dto/update-patient.dto';
 import { SearchPatientDto } from './dto/search-patient.dto';
@@ -30,6 +31,8 @@ export class PatientService {
     private patientRepo: Repository<Patient>,
     @InjectRepository(PatientHistory)
     private historyRepo: Repository<PatientHistory>,
+    @InjectRepository(UserAccount)
+    private accountRepo: Repository<UserAccount>,
     private ninEncryption: NinEncryptionService,
     private duplicateDetection: DuplicateDetectionService,
     @Inject(NIN_AUTH_SERVICE)
@@ -125,6 +128,14 @@ export class PatientService {
     }
 
     return saved;
+  }
+
+  async findByAccountId(accountId: string): Promise<Patient> {
+    const account = await this.accountRepo.findOne({ where: { accountId } });
+    if (!account?.patientNuhi) {
+      throw new NotFoundException('No patient record linked to this account');
+    }
+    return this.findByNuhi(account.patientNuhi);
   }
 
   async findByNuhi(nuhi: string): Promise<Patient> {

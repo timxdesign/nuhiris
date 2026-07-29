@@ -3,6 +3,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { api } from '../../../../lib/api-client';
+import { useAuth } from '../../../../hooks/use-auth';
+import { LabResultForm } from '../../../../components/lab-result-form';
+import { DocumentsPanel } from '../../../../components/documents-panel';
 
 interface Encounter {
   encounterId: string;
@@ -54,16 +57,39 @@ interface LabOrder {
   orderedAt: string;
 }
 
-type Tab = 'diagnoses' | 'prescriptions' | 'observations' | 'labs';
+interface Allergy {
+  allergyId: string;
+  substanceName: string;
+  substanceCode: string | null;
+  reaction: string | null;
+  severity: string | null;
+  status: string;
+}
+
+interface Immunisation {
+  immunisationId: string;
+  vaccineName: string;
+  vaccineCode: string;
+  doseNumber: number | null;
+  administeredAt: string;
+  status: string;
+}
+
+type Tab = 'diagnoses' | 'prescriptions' | 'observations' | 'labs' | 'allergies' | 'immunisations';
 
 export default function EncounterDetailPage() {
   const { encounterId } = useParams<{ encounterId: string }>();
+  const { user } = useAuth();
+  const isPharmacist = user?.role === 'pharmacist';
+  const isLabScientist = user?.role === 'lab_scientist';
   const [encounter, setEncounter] = useState<Encounter | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>('diagnoses');
   const [diagnoses, setDiagnoses] = useState<Diagnosis[]>([]);
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
   const [observations, setObservations] = useState<Observation[]>([]);
   const [labOrders, setLabOrders] = useState<LabOrder[]>([]);
+  const [allergies, setAllergies] = useState<Allergy[]>([]);
+  const [immunisations, setImmunisations] = useState<Immunisation[]>([]);
   const [showForm, setShowForm] = useState(false);
 
   const loadEncounter = useCallback(async () => {
@@ -80,8 +106,12 @@ export default function EncounterDetailPage() {
       setObservations(await api<Observation[]>(`/encounters/${encounterId}/observations`));
     } else if (activeTab === 'labs') {
       setLabOrders(await api<LabOrder[]>(`/encounters/${encounterId}/lab-orders`));
+    } else if (activeTab === 'allergies' && encounter) {
+      setAllergies(await api<Allergy[]>(`/encounters/patient/${encounter.nuhi}/allergies`));
+    } else if (activeTab === 'immunisations' && encounter) {
+      setImmunisations(await api<Immunisation[]>(`/encounters/patient/${encounter.nuhi}/immunisations`));
     }
-  }, [encounterId, activeTab]);
+  }, [encounterId, activeTab, encounter]);
 
   useEffect(() => { void loadEncounter(); }, [loadEncounter]);
   useEffect(() => { void loadTab(); }, [loadTab]);
@@ -104,6 +134,8 @@ export default function EncounterDetailPage() {
     { id: 'prescriptions', label: 'Prescriptions' },
     { id: 'observations', label: 'Observations' },
     { id: 'labs', label: 'Lab Orders' },
+    { id: 'allergies', label: 'Allergies' },
+    { id: 'immunisations', label: 'Immunisations' },
   ];
 
   return (
@@ -165,7 +197,9 @@ export default function EncounterDetailPage() {
             onClick={() => setShowForm(!showForm)}
             className="mb-4 rounded-lg bg-[#075E54] px-4 py-2 text-sm font-medium text-white hover:bg-[#064E46]"
           >
-            {showForm ? 'Cancel' : `Add ${tabs.find((t) => t.id === activeTab)?.label.slice(0, -1)}`}
+            {showForm ? 'Cancel' : `Add ${
+              { diagnoses: 'Diagnosis', prescriptions: 'Prescription', observations: 'Observation', labs: 'Lab Order', allergies: 'Allergy', immunisations: 'Immunisation' }[activeTab]
+            }`}
           </button>
         )}
 
@@ -181,11 +215,37 @@ export default function EncounterDetailPage() {
         {showForm && activeTab === 'labs' && (
           <LabOrderForm encounterId={encounterId} onSaved={() => { setShowForm(false); void loadTab(); }} />
         )}
+        {showForm && activeTab === 'allergies' && (
+          <AllergyForm encounterId={encounterId} nuhi={encounter.nuhi} onSaved={() => { setShowForm(false); void loadTab(); }} />
+        )}
+        {showForm && activeTab === 'immunisations' && (
+          <ImmunisationForm encounterId={encounterId} nuhi={encounter.nuhi} onSaved={() => { setShowForm(false); void loadTab(); }} />
+        )}
 
         {activeTab === 'diagnoses' && <DiagnosisList items={diagnoses} />}
-        {activeTab === 'prescriptions' && <PrescriptionList items={prescriptions} />}
+        {activeTab === 'prescriptions' && (
+          <PrescriptionList
+            items={prescriptions}
+            encounterId={encounterId}
+            canDispense={isPharmacist}
+            onDispensed={() => void loadTab()}
+          />
+        )}
         {activeTab === 'observations' && <ObservationList items={observations} />}
-        {activeTab === 'labs' && <LabOrderList items={labOrders} />}
+        {activeTab === 'labs' && (
+          <LabOrderList
+            items={labOrders}
+            encounterId={encounterId}
+            canRecordResult={isLabScientist}
+            onResultRecorded={() => void loadTab()}
+          />
+        )}
+        {activeTab === 'allergies' && <AllergyList items={allergies} />}
+        {activeTab === 'immunisations' && <ImmunisationList items={immunisations} />}
+      </div>
+
+      <div className="mt-8">
+        <DocumentsPanel nuhi={encounter.nuhi} encounterId={encounter.encounterId} />
       </div>
     </div>
   );
@@ -346,19 +406,258 @@ function DiagnosisList({ items }: { items: Diagnosis[] }) {
   );
 }
 
-function PrescriptionList({ items }: { items: Prescription[] }) {
+function PrescriptionList({
+  items,
+  encounterId,
+  canDispense = false,
+  onDispensed,
+}: {
+  items: Prescription[];
+  encounterId: string;
+  canDispense?: boolean;
+  onDispensed?: () => void;
+}) {
   if (items.length === 0) return <p className="py-8 text-center text-sm text-gray-500">No prescriptions.</p>;
   return (
     <div className="space-y-2">
       {items.map((p) => (
-        <div key={p.prescriptionId} className="rounded-lg border border-gray-200 bg-white p-3">
+        <PrescriptionRow
+          key={p.prescriptionId}
+          prescription={p}
+          encounterId={encounterId}
+          canDispense={canDispense}
+          onDispensed={onDispensed}
+        />
+      ))}
+    </div>
+  );
+}
+
+function PrescriptionRow({
+  prescription: p,
+  encounterId,
+  canDispense,
+  onDispensed,
+}: {
+  prescription: Prescription;
+  encounterId: string;
+  canDispense: boolean;
+  onDispensed?: () => void;
+}) {
+  const [showForm, setShowForm] = useState(false);
+  const isDispensed = p.status === 'dispensed';
+  const showDispense = canDispense && !isDispensed;
+
+  return (
+    <div className="rounded-lg border border-gray-200 bg-white p-3">
+      <div className="flex items-center justify-between">
+        <span className="text-sm font-medium text-gray-900">{p.drugName}</span>
+        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${p.status === 'active' ? 'bg-green-100 text-green-700' : isDispensed ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>
+          {p.status}
+        </span>
+      </div>
+      <p className="mt-1 text-sm text-gray-600">{p.dosage} — {p.frequency}{p.duration ? ` for ${p.duration}` : ''}</p>
+      {showDispense && (
+        <div className="mt-2">
+          <button
+            onClick={() => setShowForm((s) => !s)}
+            className="rounded border border-[#075E54] px-3 py-1 text-xs font-medium text-[#075E54] hover:bg-[#E8F5E9]"
+          >
+            {showForm ? 'Cancel' : 'Record dispense'}
+          </button>
+        </div>
+      )}
+      {showForm && (
+        <DispenseForm
+          encounterId={encounterId}
+          prescriptionId={p.prescriptionId}
+          onSaved={() => { setShowForm(false); onDispensed?.(); }}
+        />
+      )}
+    </div>
+  );
+}
+
+function DispenseForm({
+  encounterId,
+  prescriptionId,
+  onSaved,
+}: {
+  encounterId: string;
+  prescriptionId: string;
+  onSaved: () => void;
+}) {
+  const [form, setForm] = useState({ quantity: '', notes: '' });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+    try {
+      await api(`/encounters/${encounterId}/dispenses`, {
+        method: 'POST',
+        body: JSON.stringify({
+          prescriptionId,
+          quantity: form.quantity,
+          notes: form.notes || undefined,
+        }),
+      });
+      onSaved();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to record dispense');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <form onSubmit={submit} className="mt-3 space-y-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
+      <div className="grid grid-cols-2 gap-3">
+        <input placeholder="Quantity dispensed *" required value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} className="rounded border border-gray-300 px-3 py-2 text-sm" />
+        <input placeholder="Notes" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="rounded border border-gray-300 px-3 py-2 text-sm" />
+      </div>
+      {error && <p className="text-xs text-red-600">{error}</p>}
+      <button type="submit" disabled={loading} className="rounded bg-[#075E54] px-4 py-2 text-sm text-white hover:bg-[#064E46] disabled:opacity-50">
+        {loading ? 'Recording...' : 'Confirm Dispense'}
+      </button>
+    </form>
+  );
+}
+
+function AllergyForm({ encounterId, nuhi, onSaved }: { encounterId: string; nuhi: string; onSaved: () => void }) {
+  const [form, setForm] = useState({ substanceName: '', substanceCode: '', reaction: '', severity: '' });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+    try {
+      await api(`/encounters/${encounterId}/allergies`, {
+        method: 'POST',
+        body: JSON.stringify({
+          nuhi,
+          substanceName: form.substanceName,
+          substanceCode: form.substanceCode || undefined,
+          reaction: form.reaction || undefined,
+          severity: form.severity || undefined,
+        }),
+      });
+      onSaved();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to record allergy');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <form onSubmit={submit} className="mb-6 rounded-lg border border-gray-200 bg-white p-4 space-y-3">
+      <div className="grid grid-cols-2 gap-3">
+        <input placeholder="Substance name *" required value={form.substanceName} onChange={(e) => setForm({ ...form, substanceName: e.target.value })} className="rounded border border-gray-300 px-3 py-2 text-sm" />
+        <input placeholder="Substance code" value={form.substanceCode} onChange={(e) => setForm({ ...form, substanceCode: e.target.value })} className="rounded border border-gray-300 px-3 py-2 text-sm" />
+        <input placeholder="Reaction" value={form.reaction} onChange={(e) => setForm({ ...form, reaction: e.target.value })} className="rounded border border-gray-300 px-3 py-2 text-sm" />
+        <select value={form.severity} onChange={(e) => setForm({ ...form, severity: e.target.value })} className="rounded border border-gray-300 px-3 py-2 text-sm">
+          <option value="">Severity…</option>
+          <option value="mild">Mild</option>
+          <option value="moderate">Moderate</option>
+          <option value="severe">Severe</option>
+        </select>
+      </div>
+      {error && <p className="text-xs text-red-600">{error}</p>}
+      <button type="submit" disabled={loading} className="rounded bg-[#075E54] px-4 py-2 text-sm text-white hover:bg-[#064E46] disabled:opacity-50">
+        {loading ? 'Saving...' : 'Save Allergy'}
+      </button>
+    </form>
+  );
+}
+
+function ImmunisationForm({ encounterId, nuhi, onSaved }: { encounterId: string; nuhi: string; onSaved: () => void }) {
+  const [form, setForm] = useState({ vaccineCode: '', vaccineName: '', doseNumber: '', lotNumber: '', site: '', route: '', administeredAt: '', notes: '' });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+    try {
+      await api(`/encounters/${encounterId}/immunisations`, {
+        method: 'POST',
+        body: JSON.stringify({
+          nuhi,
+          vaccineCode: form.vaccineCode,
+          vaccineName: form.vaccineName,
+          doseNumber: form.doseNumber ? parseInt(form.doseNumber, 10) : undefined,
+          lotNumber: form.lotNumber || undefined,
+          site: form.site || undefined,
+          route: form.route || undefined,
+          administeredAt: form.administeredAt ? new Date(form.administeredAt).toISOString() : undefined,
+          notes: form.notes || undefined,
+        }),
+      });
+      onSaved();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to record immunisation');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <form onSubmit={submit} className="mb-6 rounded-lg border border-gray-200 bg-white p-4 space-y-3">
+      <div className="grid grid-cols-2 gap-3">
+        <input placeholder="Vaccine code *" required value={form.vaccineCode} onChange={(e) => setForm({ ...form, vaccineCode: e.target.value })} className="rounded border border-gray-300 px-3 py-2 text-sm" />
+        <input placeholder="Vaccine name *" required value={form.vaccineName} onChange={(e) => setForm({ ...form, vaccineName: e.target.value })} className="rounded border border-gray-300 px-3 py-2 text-sm" />
+        <input placeholder="Dose number" type="number" min="1" value={form.doseNumber} onChange={(e) => setForm({ ...form, doseNumber: e.target.value })} className="rounded border border-gray-300 px-3 py-2 text-sm" />
+        <input placeholder="Lot number" value={form.lotNumber} onChange={(e) => setForm({ ...form, lotNumber: e.target.value })} className="rounded border border-gray-300 px-3 py-2 text-sm" />
+        <input placeholder="Site (e.g. left deltoid)" value={form.site} onChange={(e) => setForm({ ...form, site: e.target.value })} className="rounded border border-gray-300 px-3 py-2 text-sm" />
+        <input placeholder="Route (e.g. intramuscular)" value={form.route} onChange={(e) => setForm({ ...form, route: e.target.value })} className="rounded border border-gray-300 px-3 py-2 text-sm" />
+        <input placeholder="Administered at" type="datetime-local" value={form.administeredAt} onChange={(e) => setForm({ ...form, administeredAt: e.target.value })} className="rounded border border-gray-300 px-3 py-2 text-sm" />
+        <input placeholder="Notes" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="rounded border border-gray-300 px-3 py-2 text-sm" />
+      </div>
+      {error && <p className="text-xs text-red-600">{error}</p>}
+      <button type="submit" disabled={loading} className="rounded bg-[#075E54] px-4 py-2 text-sm text-white hover:bg-[#064E46] disabled:opacity-50">
+        {loading ? 'Saving...' : 'Save Immunisation'}
+      </button>
+    </form>
+  );
+}
+
+function AllergyList({ items }: { items: Allergy[] }) {
+  if (items.length === 0) return <p className="py-8 text-center text-sm text-gray-500">No known allergies for this patient.</p>;
+  return (
+    <div className="space-y-2">
+      {items.map((a) => (
+        <div key={a.allergyId} className="rounded-lg border border-gray-200 bg-white p-3">
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-gray-900">{p.drugName}</span>
-            <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${p.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
-              {p.status}
-            </span>
+            <span className="text-sm font-medium text-red-800">{a.substanceName}</span>
+            {a.severity && <span className="rounded bg-red-50 px-2 py-0.5 text-xs text-red-700">{a.severity}</span>}
           </div>
-          <p className="mt-1 text-sm text-gray-600">{p.dosage} — {p.frequency}{p.duration ? ` for ${p.duration}` : ''}</p>
+          {a.reaction && <p className="mt-1 text-sm text-gray-600">Reaction: {a.reaction}</p>}
+          {a.substanceCode && <p className="mt-0.5 font-mono text-xs text-gray-400">{a.substanceCode}</p>}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ImmunisationList({ items }: { items: Immunisation[] }) {
+  if (items.length === 0) return <p className="py-8 text-center text-sm text-gray-500">No immunisation records for this patient.</p>;
+  return (
+    <div className="space-y-2">
+      {items.map((im) => (
+        <div key={im.immunisationId} className="rounded-lg border border-gray-200 bg-white p-3">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-gray-900">
+              {im.vaccineName}{im.doseNumber ? ` (Dose ${im.doseNumber})` : ''}
+            </span>
+            <span className="text-xs text-gray-500">{new Date(im.administeredAt).toLocaleDateString()}</span>
+          </div>
+          <p className="mt-0.5 font-mono text-xs text-gray-400">{im.vaccineCode}</p>
         </div>
       ))}
     </div>
@@ -385,21 +684,75 @@ function ObservationList({ items }: { items: Observation[] }) {
   );
 }
 
-function LabOrderList({ items }: { items: LabOrder[] }) {
+function LabOrderList({
+  items,
+  encounterId,
+  canRecordResult = false,
+  onResultRecorded,
+}: {
+  items: LabOrder[];
+  encounterId: string;
+  canRecordResult?: boolean;
+  onResultRecorded?: () => void;
+}) {
   if (items.length === 0) return <p className="py-8 text-center text-sm text-gray-500">No lab orders.</p>;
   return (
     <div className="space-y-2">
       {items.map((l) => (
-        <div key={l.orderId} className="rounded-lg border border-gray-200 bg-white p-3">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-gray-900">{l.testName}</span>
-            <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${l.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
-              {l.status}
-            </span>
-          </div>
-          <p className="mt-1 text-xs text-gray-500">{l.loincCode} | {l.urgency} | {new Date(l.orderedAt).toLocaleDateString()}</p>
-        </div>
+        <LabOrderRow
+          key={l.orderId}
+          order={l}
+          encounterId={encounterId}
+          canRecordResult={canRecordResult}
+          onResultRecorded={onResultRecorded}
+        />
       ))}
     </div>
   );
 }
+
+function LabOrderRow({
+  order: l,
+  encounterId,
+  canRecordResult,
+  onResultRecorded,
+}: {
+  order: LabOrder;
+  encounterId: string;
+  canRecordResult: boolean;
+  onResultRecorded?: () => void;
+}) {
+  const [showForm, setShowForm] = useState(false);
+  const isCompleted = l.status === 'completed';
+  const showRecord = canRecordResult && !isCompleted;
+
+  return (
+    <div className="rounded-lg border border-gray-200 bg-white p-3">
+      <div className="flex items-center justify-between">
+        <span className="text-sm font-medium text-gray-900">{l.testName}</span>
+        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${isCompleted ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+          {l.status}
+        </span>
+      </div>
+      <p className="mt-1 text-xs text-gray-500">{l.loincCode} | {l.urgency} | {new Date(l.orderedAt).toLocaleDateString()}</p>
+      {showRecord && (
+        <div className="mt-2">
+          <button
+            onClick={() => setShowForm((s) => !s)}
+            className="rounded border border-[#075E54] px-3 py-1 text-xs font-medium text-[#075E54] hover:bg-[#E8F5E9]"
+          >
+            {showForm ? 'Cancel' : 'Record result'}
+          </button>
+        </div>
+      )}
+      {showForm && (
+        <LabResultForm
+          encounterId={encounterId}
+          orderId={l.orderId}
+          onSaved={() => { setShowForm(false); onResultRecorded?.(); }}
+        />
+      )}
+    </div>
+  );
+}
+

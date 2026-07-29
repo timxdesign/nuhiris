@@ -4,7 +4,7 @@ interface ApiOptions extends RequestInit {
   skipAuth?: boolean;
 }
 
-class ApiError extends Error {
+export class ApiError extends Error {
   constructor(
     public status: number,
     message: string,
@@ -44,7 +44,7 @@ export async function api<T>(path: string, options: ApiOptions = {}): Promise<T>
   const { skipAuth, ...fetchOptions } = options;
   const headers = new Headers(fetchOptions.headers);
 
-  if (!headers.has('Content-Type') && fetchOptions.body) {
+  if (!headers.has('Content-Type') && fetchOptions.body && !(fetchOptions.body instanceof FormData)) {
     headers.set('Content-Type', 'application/json');
   }
 

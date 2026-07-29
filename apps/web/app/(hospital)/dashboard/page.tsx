@@ -1,7 +1,26 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { api } from '../../../lib/api-client';
 import { useAuth } from '../../../hooks/use-auth';
+
+interface AnalyticsSummary {
+  registrations: {
+    total: number;
+    provisional: number;
+    biometricVerified: number;
+    upgradeRate: number;
+  };
+  encounters: {
+    total: number;
+    open: number;
+    closed: number;
+  };
+  generatedAt: string;
+}
+
+const ADMIN_ROLES = ['national_admin', 'facility_admin'];
 
 function StatCard({ label, value, color = 'text-gray-900' }: { label: string; value: string; color?: string }) {
   return (
@@ -24,8 +43,66 @@ function QuickAction({ href, label, description }: { href: string; label: string
   );
 }
 
+interface Action {
+  href: string;
+  label: string;
+  description: string;
+}
+
+function actionsForRole(role: string | undefined): Action[] {
+  switch (role) {
+    case 'pharmacist':
+      return [
+        { href: '/pharmacy', label: 'Pharmacy Worklist', description: 'Review prescriptions and record dispenses' },
+        { href: '/patients', label: 'Search Patients', description: 'Look up a patient by name, NIN, or NUHI' },
+      ];
+    case 'lab_scientist':
+      return [
+        { href: '/lab', label: 'Lab Worklist', description: 'Review lab orders and record results' },
+        { href: '/patients', label: 'Search Patients', description: 'Look up a patient by name, NIN, or NUHI' },
+      ];
+    case 'medical_officer':
+    case 'nurse':
+      return [
+        { href: '/patients', label: 'Search Patients', description: 'Look up a patient by name, NIN, or NUHI' },
+        { href: '/encounters/new', label: 'Open Encounter', description: 'Start a new clinical encounter' },
+        { href: '/referrals', label: 'Referrals', description: 'Create and track patient referrals' },
+      ];
+    case 'audit_inspector':
+      return [
+        { href: '/audit', label: 'View Audit Log', description: 'Review system activity and access records' },
+      ];
+    case 'national_admin':
+    case 'facility_admin':
+      return [
+        { href: '/admin/providers', label: 'Manage Providers', description: 'Create, verify, and affiliate providers' },
+        { href: '/admin/facilities', label: 'Manage Facilities', description: 'Register and update facilities' },
+        { href: '/audit', label: 'View Audit Log', description: 'Review system activity and access records' },
+      ];
+    default:
+      // health_records_officer and any other staff role
+      return [
+        { href: '/patients/register', label: 'Register New Patient', description: 'Create a new health identity (NUHI) for a patient' },
+        { href: '/patients', label: 'Search Patients', description: 'Look up a patient by name, NIN, or NUHI' },
+      ];
+  }
+}
+
 export default function DashboardPage() {
   const { user } = useAuth();
+  const isAdmin = user != null && ADMIN_ROLES.includes(user.role);
+  const [summary, setSummary] = useState<AnalyticsSummary | null>(null);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    let cancelled = false;
+    api<AnalyticsSummary>('/analytics/summary')
+      .then((data) => { if (!cancelled) setSummary(data); })
+      .catch(() => { /* stats stay hidden on failure */ });
+    return () => { cancelled = true; };
+  }, [isAdmin]);
+
+  const actions = actionsForRole(user?.role);
 
   return (
     <div>
@@ -42,45 +119,57 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <div className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          label="Your Role"
-          value={user?.role.replace(/_/g, ' ') ?? '—'}
-        />
-        <StatCard
-          label="MFA Status"
-          value={user?.mfaEnabled ? 'Enabled' : 'Not Configured'}
-          color={user?.mfaEnabled ? 'text-green-700' : 'text-amber-600'}
-        />
-        <StatCard
-          label="Facility"
-          value={user?.facilityId ? 'Assigned' : 'National'}
-          color="text-[#075E54]"
-        />
-        <StatCard
-          label="Session"
-          value="Active"
-          color="text-green-700"
-        />
-      </div>
+      {isAdmin && summary ? (
+        <div className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+          <StatCard
+            label="Registered Patients"
+            value={summary.registrations.total.toLocaleString()}
+            color="text-[#075E54]"
+          />
+          <StatCard
+            label="Provisional Registrations"
+            value={summary.registrations.provisional.toLocaleString()}
+            color={summary.registrations.provisional > 0 ? 'text-amber-600' : 'text-gray-900'}
+          />
+          <StatCard
+            label="Encounters (30 days)"
+            value={summary.encounters.total.toLocaleString()}
+          />
+          <StatCard
+            label="Open Encounters"
+            value={summary.encounters.open.toLocaleString()}
+            color={summary.encounters.open > 0 ? 'text-blue-700' : 'text-gray-900'}
+          />
+        </div>
+      ) : (
+        <div className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+          <StatCard
+            label="Your Role"
+            value={user?.role.replace(/_/g, ' ') ?? '—'}
+          />
+          <StatCard
+            label="MFA Status"
+            value={user?.mfaEnabled ? 'Enabled' : 'Not Configured'}
+            color={user?.mfaEnabled ? 'text-green-700' : 'text-amber-600'}
+          />
+          <StatCard
+            label="Facility"
+            value={user?.facilityId ? 'Assigned' : 'National'}
+            color="text-[#075E54]"
+          />
+          <StatCard
+            label="Session"
+            value="Active"
+            color="text-green-700"
+          />
+        </div>
+      )}
 
       <h2 className="mt-10 mb-4 text-lg font-semibold text-gray-900">Quick Actions</h2>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <QuickAction
-          href="/patients/register"
-          label="Register New Patient"
-          description="Create a new health identity (NUHI) for a patient"
-        />
-        <QuickAction
-          href="/patients"
-          label="Search Patients"
-          description="Look up a patient by name, NIN, or NUHI"
-        />
-        <QuickAction
-          href="/audit"
-          label="View Audit Log"
-          description="Review system activity and access records"
-        />
+        {actions.map((a) => (
+          <QuickAction key={a.href} href={a.href} label={a.label} description={a.description} />
+        ))}
       </div>
 
       {!user?.mfaEnabled && (

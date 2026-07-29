@@ -4,6 +4,7 @@ import { ConflictException, NotFoundException, BadRequestException } from '@nest
 import { PatientService } from '../patient.service';
 import { Patient } from '../entities/patient.entity';
 import { PatientHistory } from '../entities/patient-history.entity';
+import { UserAccount } from '../../auth/entities/user-account.entity';
 import { NinEncryptionService } from '../services/nin-encryption.service';
 import { DuplicateDetectionService } from '../services/duplicate-detection.service';
 import { NIN_AUTH_SERVICE } from '../../external/tokens';
@@ -59,6 +60,9 @@ describe('PatientService', () => {
     checkByNin: jest.Mock;
     checkByDemographics: jest.Mock;
   };
+  let accountRepo: {
+    findOne: jest.Mock;
+  };
 
   beforeEach(async () => {
     patientRepo = {
@@ -96,11 +100,16 @@ describe('PatientService', () => {
       }),
     };
 
+    accountRepo = {
+      findOne: jest.fn(),
+    };
+
     const module = await Test.createTestingModule({
       providers: [
         PatientService,
         { provide: getRepositoryToken(Patient), useValue: patientRepo },
         { provide: getRepositoryToken(PatientHistory), useValue: historyRepo },
+        { provide: getRepositoryToken(UserAccount), useValue: accountRepo },
         { provide: NinEncryptionService, useValue: ninEncryption },
         { provide: DuplicateDetectionService, useValue: duplicateDetection },
         {
@@ -231,6 +240,26 @@ describe('PatientService', () => {
     it('throws NotFoundException', async () => {
       patientRepo.findOne.mockResolvedValue(null);
       await expect(service.findByNuhi('unknown')).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('findByAccountId', () => {
+    it('returns the patient linked to the account', async () => {
+      accountRepo.findOne.mockResolvedValue({ accountId: 'acc-1', patientNuhi: 'nuhi-1' });
+      patientRepo.findOne.mockResolvedValue(mockPatient);
+      const result = await service.findByAccountId('acc-1');
+      expect(result.nuhi).toBe('nuhi-1');
+      expect(accountRepo.findOne).toHaveBeenCalledWith({ where: { accountId: 'acc-1' } });
+    });
+
+    it('throws NotFoundException when the account has no linked patient', async () => {
+      accountRepo.findOne.mockResolvedValue({ accountId: 'acc-1', patientNuhi: null });
+      await expect(service.findByAccountId('acc-1')).rejects.toThrow(NotFoundException);
+    });
+
+    it('throws NotFoundException when the account does not exist', async () => {
+      accountRepo.findOne.mockResolvedValue(null);
+      await expect(service.findByAccountId('missing')).rejects.toThrow(NotFoundException);
     });
   });
 

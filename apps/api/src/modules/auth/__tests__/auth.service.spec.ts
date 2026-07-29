@@ -28,6 +28,7 @@ const mockUser: UserAccount = {
   mfaType: null,
   providerId: 'prov-1',
   facilityId: 'fac-1',
+  patientNuhi: null,
   status: 'active',
   lastLoginAt: null,
   failedAttempts: 0,
