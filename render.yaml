@@ -1,0 +1,57 @@
+# Render blueprint for the NUHIRIS API.
+#
+# The web portal is deployed separately on Vercel and the database on Neon;
+# only the API and its Redis instance live here.
+#
+# Secrets are intentionally NOT committed. Values marked `sync: false` must be
+# set in the Render dashboard (or via the API) before the first deploy:
+#   DATABASE_URL   — Neon pooled connection string (must include ?sslmode=require)
+#   JWT_DEV_SECRET — random 32+ byte string
+#   ENCRYPTION_KEY — 64 hex chars (32 bytes) for AES-256-GCM
+#   HMAC_KEY       — 64 hex chars (32 bytes)
+#   CORS_ORIGIN    — the Vercel production URL, e.g. https://nuhiris.vercel.app
+
+services:
+  - type: web
+    name: nuhiris-api
+    runtime: docker
+    dockerfilePath: ./apps/api/Dockerfile
+    dockerContext: .
+    plan: free
+    region: oregon
+    healthCheckPath: /api/v1/health/live
+    # Applies pending migrations before the new instance takes traffic.
+    preDeployCommand: cd apps/api && pnpm migration:run:prod
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: DATABASE_SSL
+        value: "true"
+      - key: REDIS_URL
+        fromService:
+          name: nuhiris-redis
+          type: redis
+          property: connectionString
+      - key: USE_REAL_NIMC
+        value: "false"
+      - key: VAULT_ENABLED
+        value: "false"
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_DEV_SECRET
+        sync: false
+      - key: ENCRYPTION_KEY
+        sync: false
+      - key: HMAC_KEY
+        sync: false
+      - key: CORS_ORIGIN
+        sync: false
+
+  - type: redis
+    name: nuhiris-redis
+    plan: free
+    region: oregon
+    maxmemoryPolicy: noeviction
+    ipAllowList: []

@@ -124,7 +124,7 @@ describe('FacilityService', () => {
 
   describe('search', () => {
     it('returns paginated results', async () => {
-      const [items, total] = await service.search({ state: 'Lagos' }, 1, 20);
+      const [items, total] = await service.search({ state: 'Lagos', page: 1, limit: 20 }, 1, 20);
       expect(items).toHaveLength(1);
       expect(total).toBe(1);
     });

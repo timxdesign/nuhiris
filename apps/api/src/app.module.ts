@@ -70,11 +70,17 @@ import { Provenance } from './modules/audit/entities/provenance.entity';
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
         type: 'postgres' as const,
-        host: config.get<string>('database.host'),
-        port: config.get<number>('database.port'),
-        database: config.get<string>('database.name'),
-        username: config.get<string>('database.username'),
-        password: config.get<string>('database.password'),
+        // A managed provider URL supersedes the discrete host/port settings.
+        ...(config.get<string>('database.url')
+          ? { url: config.get<string>('database.url') }
+          : {
+              host: config.get<string>('database.host'),
+              port: config.get<number>('database.port'),
+              database: config.get<string>('database.name'),
+              username: config.get<string>('database.username'),
+              password: config.get<string>('database.password'),
+            }),
+        ssl: config.get<boolean>('database.ssl') ? { rejectUnauthorized: false } : false,
         entities: [
           Patient,
           PatientHistory,

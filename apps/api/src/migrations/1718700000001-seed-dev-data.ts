@@ -6,7 +6,7 @@ export class SeedDevData1718700000001 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
     // Password hash for "Password1!" — bcrypt 10 rounds
     const passwordHash =
-      '$2b$10$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36i5sNqPL5E.kY7FGk.G2q6';
+      '$2b$10$OoXH68bWyiDnhKzKzjr2Uen48VfxWNlXPs1tqwLjkh7w.VO/oi.ee';
 
     // ─── Facility ───
     await queryRunner.query(`

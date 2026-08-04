@@ -13,7 +13,6 @@ import { FacilityService } from './facility.service';
 import { CreateFacilityDto } from './dto/create-facility.dto';
 import { UpdateFacilityDto } from './dto/update-facility.dto';
 import { SearchFacilityDto } from './dto/search-facility.dto';
-import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -31,8 +30,8 @@ export class FacilityController {
   }
 
   @Get()
-  search(@Query() searchDto: SearchFacilityDto, @Query() pagination: PaginationQueryDto) {
-    return this.facilityService.search(searchDto, pagination.page, pagination.limit);
+  search(@Query() searchDto: SearchFacilityDto) {
+    return this.facilityService.search(searchDto, searchDto.page, searchDto.limit);
   }
 
   @Get(':facilityId')

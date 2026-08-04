@@ -6,10 +6,13 @@ COPY pnpm-lock.yaml pnpm-workspace.yaml package.json tsconfig.base.json ./
 COPY apps/api/ apps/api/
 COPY packages/ packages/
 RUN pnpm install --frozen-lockfile
-RUN pnpm --filter @nuhiris/shared-types build 2>/dev/null; \
-    pnpm --filter @nuhiris/crypto-utils build 2>/dev/null; \
-    pnpm --filter @nuhiris/fhir-utils build 2>/dev/null; \
-    pnpm --filter @nuhiris/api build
+# Chained with && and no output suppression: a failing workspace build must
+# fail the image, not silently produce one with no dist/main.js.
+RUN pnpm --filter @nuhiris/shared-types build && \
+    pnpm --filter @nuhiris/crypto-utils build && \
+    pnpm --filter @nuhiris/fhir-utils build && \
+    pnpm --filter @nuhiris/api build && \
+    test -f apps/api/dist/main.js
 
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 USER appuser

@@ -1,7 +1,10 @@
 import { IsOptional, IsString, IsEnum } from 'class-validator';
 import { FacilityType, LevelOfCare } from '@nuhiris/shared-types';
+import { PaginationQueryDto } from '../../../common/dto/pagination-query.dto';
 
-export class SearchFacilityDto {
+// See SearchPatientDto: pagination is folded in so the handler binds one
+// @Query() object under the pipe's forbidNonWhitelisted setting.
+export class SearchFacilityDto extends PaginationQueryDto {
   @IsOptional()
   @IsString()
   name?: string;

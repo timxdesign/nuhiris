@@ -136,7 +136,7 @@ describe('ProviderService', () => {
 
   describe('search', () => {
     it('returns paginated results', async () => {
-      const [items, total] = await service.search({ fullName: 'Emeka' }, 1, 20);
+      const [items, total] = await service.search({ fullName: 'Emeka', page: 1, limit: 20 }, 1, 20);
       expect(items).toHaveLength(1);
       expect(total).toBe(1);
     });

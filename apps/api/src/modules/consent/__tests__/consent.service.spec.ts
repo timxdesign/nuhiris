@@ -4,6 +4,7 @@ import { ForbiddenException, BadRequestException, NotFoundException } from '@nes
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ConsentService } from '../consent.service';
 import { Consent } from '../entities/consent.entity';
+import { UserAccount } from '../../auth/entities/user-account.entity';
 import { AuditService } from '../../audit/audit.service';
 import { ConsentPurpose } from '@nuhiris/shared-types';
 
@@ -25,6 +26,7 @@ const mockConsent: Consent = {
 describe('ConsentService', () => {
   let service: ConsentService;
   let consentRepo: { findOne: jest.Mock; find: jest.Mock; create: jest.Mock; save: jest.Mock; manager: { query: jest.Mock } };
+  let userRepo: { findOne: jest.Mock };
   let auditService: { create: jest.Mock };
   let eventEmitter: { emit: jest.Mock };
 
@@ -37,6 +39,7 @@ describe('ConsentService', () => {
       manager: { query: jest.fn().mockResolvedValue([]) },
     };
 
+    userRepo = { findOne: jest.fn().mockResolvedValue(null) };
     auditService = { create: jest.fn().mockResolvedValue({}) };
     eventEmitter = { emit: jest.fn() };
 
@@ -44,6 +47,7 @@ describe('ConsentService', () => {
       providers: [
         ConsentService,
         { provide: getRepositoryToken(Consent), useValue: consentRepo },
+        { provide: getRepositoryToken(UserAccount), useValue: userRepo },
         { provide: AuditService, useValue: auditService },
         { provide: EventEmitter2, useValue: eventEmitter },
       ],
@@ -98,6 +102,50 @@ describe('ConsentService', () => {
       });
       expect(result.permitted).toBe(true);
       expect(result.reason).toBe('admin_role');
+    });
+
+    it('permits a patient reading their own record', async () => {
+      userRepo.findOne.mockResolvedValue({ accountId: 'acct-1', patientNuhi: 'nuhi-1' });
+      const result = await service.checkAccess({
+        actorId: 'acct-1',
+        actorRoles: ['patient'],
+        actorFacilityId: null,
+        actorProviderId: null,
+        patientNuhi: 'nuhi-1',
+        resourceType: 'consents',
+      });
+      expect(result.permitted).toBe(true);
+      expect(result.reason).toBe('self_access');
+    });
+
+    it('denies a patient reading someone else’s record', async () => {
+      userRepo.findOne.mockResolvedValue({ accountId: 'acct-1', patientNuhi: 'nuhi-1' });
+      const result = await service.checkAccess({
+        actorId: 'acct-1',
+        actorRoles: ['patient'],
+        actorFacilityId: null,
+        actorProviderId: null,
+        patientNuhi: 'nuhi-999',
+        resourceType: 'consents',
+      });
+      expect(result.permitted).toBe(false);
+      expect(result.reason).toBe('not_own_record');
+    });
+
+    it('does not query consents when the actor has no provider or facility', async () => {
+      consentRepo.manager.query.mockResolvedValue([]);
+      consentRepo.findOne.mockClear();
+      const result = await service.checkAccess({
+        actorId: 'user-1',
+        actorRoles: ['health_records_officer'],
+        actorFacilityId: null,
+        actorProviderId: null,
+        patientNuhi: 'nuhi-1',
+        resourceType: 'encounters',
+      });
+      // grantee_id is a uuid column — an empty-string lookup would throw at the DB
+      expect(consentRepo.findOne).not.toHaveBeenCalled();
+      expect(result.permitted).toBe(false);
     });
 
     it('permits with active encounter link', async () => {

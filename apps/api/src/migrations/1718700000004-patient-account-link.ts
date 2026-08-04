@@ -18,7 +18,7 @@ export class PatientAccountLink1718700000004 implements MigrationInterface {
         'c0000000-0000-4000-8000-000000000008',
         'patient.ada',
         'ada@example.com',
-        '$2b$10$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36i5sNqPL5E.kY7FGk.G2q6',
+        '$2b$10$OoXH68bWyiDnhKzKzjr2Uen48VfxWNlXPs1tqwLjkh7w.VO/oi.ee',
         'patient',
         false,
         'active',

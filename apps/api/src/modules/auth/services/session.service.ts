@@ -23,11 +23,14 @@ export class SessionService implements OnModuleInit, OnModuleDestroy {
   constructor(private config: ConfigService) {}
 
   onModuleInit() {
-    this.redis = new Redis({
-      host: this.config.get<string>('redis.host'),
-      port: this.config.get<number>('redis.port'),
-      lazyConnect: true,
-    });
+    const url = this.config.get<string>('redis.url');
+    this.redis = url
+      ? new Redis(url, { lazyConnect: true })
+      : new Redis({
+          host: this.config.get<string>('redis.host'),
+          port: this.config.get<number>('redis.port'),
+          lazyConnect: true,
+        });
   }
 
   async onModuleDestroy() {

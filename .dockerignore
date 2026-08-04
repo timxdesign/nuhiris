@@ -1,0 +1,26 @@
+# Never ship host build artifacts into an image. A copied tsconfig.tsbuildinfo
+# makes tsc believe the output is already current, so `nest build` silently
+# emits nothing and the image ends up without dist/main.js.
+**/dist
+**/.next
+**/*.tsbuildinfo
+**/node_modules
+**/coverage
+**/.turbo
+
+# Secrets and local-only files
+.env
+.env.*
+!.env.example
+
+# VCS / editor / CI noise
+.git
+.github
+.vscode
+.idea
+**/.DS_Store
+
+# Not needed at runtime
+docs
+infra
+scripts

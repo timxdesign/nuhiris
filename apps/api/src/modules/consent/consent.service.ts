@@ -5,8 +5,9 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, IsNull } from 'typeorm';
+import { Repository, IsNull, FindOptionsWhere } from 'typeorm';
 import { Consent } from './entities/consent.entity';
+import { UserAccount } from '../auth/entities/user-account.entity';
 import { GrantConsentDto } from './dto/grant-consent.dto';
 import { AuditService } from '../audit/audit.service';
 import { AuditAction } from '@nuhiris/shared-types';
@@ -27,6 +28,8 @@ export class ConsentService {
   constructor(
     @InjectRepository(Consent)
     private consentRepo: Repository<Consent>,
+    @InjectRepository(UserAccount)
+    private userRepo: Repository<UserAccount>,
     private auditService: AuditService,
     private eventEmitter: EventEmitter2,
   ) {}
@@ -95,6 +98,19 @@ export class ConsentService {
       return { permitted: true, reason: 'admin_role' };
     }
 
+    // A patient always has access to their own record — no consent needed to
+    // read what is already yours.
+    if (actorRoles.includes('patient')) {
+      const account = await this.userRepo.findOne({
+        where: { accountId: actorId },
+        select: { accountId: true, patientNuhi: true },
+      });
+      if (account?.patientNuhi === patientNuhi) {
+        return { permitted: true, reason: 'self_access' };
+      }
+      return { permitted: false, reason: 'not_own_record' };
+    }
+
     if (actorProviderId && actorFacilityId) {
       const hasActiveEncounter = await this.hasActiveEncounterLink(
         actorProviderId,
@@ -106,22 +122,30 @@ export class ConsentService {
       }
     }
 
-    const consent = await this.consentRepo.findOne({
-      where: [
-        {
-          nuhi: patientNuhi,
-          granteeType: 'provider',
-          granteeId: actorProviderId ?? '',
-          revokedAt: IsNull(),
-        },
-        {
-          nuhi: patientNuhi,
-          granteeType: 'facility',
-          granteeId: actorFacilityId ?? '',
-          revokedAt: IsNull(),
-        },
-      ],
-    });
+    // Only match on identifiers the actor actually has — grantee_id is a uuid
+    // column, so coercing a missing id to '' makes Postgres reject the query.
+    const granteeConditions: FindOptionsWhere<Consent>[] = [];
+    if (actorProviderId) {
+      granteeConditions.push({
+        nuhi: patientNuhi,
+        granteeType: 'provider',
+        granteeId: actorProviderId,
+        revokedAt: IsNull(),
+      });
+    }
+    if (actorFacilityId) {
+      granteeConditions.push({
+        nuhi: patientNuhi,
+        granteeType: 'facility',
+        granteeId: actorFacilityId,
+        revokedAt: IsNull(),
+      });
+    }
+
+    const consent =
+      granteeConditions.length > 0
+        ? await this.consentRepo.findOne({ where: granteeConditions })
+        : null;
 
     if (consent) {
       if (consent.validTo && new Date(consent.validTo) < new Date()) {

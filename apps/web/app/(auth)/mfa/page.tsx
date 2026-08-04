@@ -4,6 +4,7 @@ import { useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '../../../lib/api-client';
 import { useAuthStore } from '../../../store/auth-store';
+import { landingPathForRole } from '../../../lib/demo-accounts';
 
 interface AuthResponse {
   accessToken: string;
@@ -47,7 +48,7 @@ export default function MfaPage() {
 
       sessionStorage.removeItem('mfaSessionToken');
       login(result.accessToken, result.refreshToken, result.user);
-      router.push('/dashboard');
+      router.push(landingPathForRole(result.user.role));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Verification failed');
     } finally {

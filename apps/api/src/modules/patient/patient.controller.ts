@@ -13,7 +13,6 @@ import { PatientService } from './patient.service';
 import { RegisterPatientDto } from './dto/register-patient.dto';
 import { UpdatePatientDto } from './dto/update-patient.dto';
 import { SearchPatientDto } from './dto/search-patient.dto';
-import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -38,8 +37,8 @@ export class PatientController {
   }
 
   @Get('search')
-  search(@Query() searchDto: SearchPatientDto, @Query() pagination: PaginationQueryDto) {
-    return this.patientService.search(searchDto, pagination.page, pagination.limit);
+  search(@Query() searchDto: SearchPatientDto) {
+    return this.patientService.search(searchDto, searchDto.page, searchDto.limit);
   }
 
   @Get('me')

@@ -23,8 +23,27 @@ async function bootstrap() {
   app.useGlobalFilters(new GlobalExceptionFilter());
   app.useGlobalInterceptors(new ResponseTransformInterceptor());
 
+  // CORS_ORIGIN accepts a comma-separated list. Vercel mints a new hostname for
+  // every preview deploy, so allow those for the project as well.
+  const allowedOrigins = (process.env.CORS_ORIGIN ?? 'http://localhost:3001')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
+
   app.enableCors({
-    origin: process.env.CORS_ORIGIN ?? 'http://localhost:3001',
+    origin: (
+      origin: string | undefined,
+      callback: (err: Error | null, allow?: boolean) => void,
+    ) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+        return;
+      }
+      const isVercelPreview =
+        process.env.VERCEL_PREVIEW_PATTERN !== undefined &&
+        new RegExp(process.env.VERCEL_PREVIEW_PATTERN).test(origin);
+      callback(isVercelPreview ? null : new Error('Not allowed by CORS'), isVercelPreview);
+    },
     credentials: true,
   });
 
