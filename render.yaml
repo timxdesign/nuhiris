@@ -18,10 +18,14 @@ services:
     dockerfilePath: ./apps/api/Dockerfile
     dockerContext: .
     plan: free
-    region: oregon
+    region: frankfurt
     healthCheckPath: /api/v1/health/live
-    # Applies pending migrations before the new instance takes traffic.
-    preDeployCommand: cd apps/api && pnpm migration:run:prod
+    # NOTE: preDeployCommand is a paid-instance feature, so on the free plan
+    # migrations are NOT applied automatically. Run them against Neon from a
+    # machine with the DATABASE_URL set:
+    #   cd apps/api && pnpm migration:run
+    # If this service is later moved to a paid plan, re-enable:
+    #   preDeployCommand: cd apps/api && pnpm migration:run:prod
     envVars:
       - key: NODE_ENV
         value: production
@@ -52,6 +56,6 @@ services:
   - type: redis
     name: nuhiris-redis
     plan: free
-    region: oregon
+    region: frankfurt
     maxmemoryPolicy: noeviction
     ipAllowList: []
